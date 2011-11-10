@@ -1210,19 +1210,51 @@ static CGFloat AttachmentRunDelegateGetWidth(void *refCon) {
     NSInteger newPos = pos.index;
     
     switch (direction) {
-        case UITextLayoutDirectionRight:
+        case UITextLayoutDirectionRight: {
             newPos += offset;
-            break;
-        case UITextLayoutDirectionLeft:
+        } break;
+        case UITextLayoutDirectionLeft: {
             newPos -= offset;
-            break;
-        UITextLayoutDirectionUp: // not supported right now
-            break; 
-        UITextLayoutDirectionDown: // not supported right now
-            break;
-        default:
-            break;
-
+        } break;
+        case UITextLayoutDirectionUp: {
+            // Iterate through lines to find the one which contains the position given
+            CFArrayRef lines = CTFrameGetLines(_frame);
+            for (NSInteger i = 0; i < CFArrayGetCount(lines); i++) {
+                CTLineRef line = CFArrayGetValueAtIndex(lines, i);
+                CFRange lineRange = CTLineGetStringRange(line);
+                if (lineRange.location <= newPos && newPos <= (lineRange.location + lineRange.length)) {
+                    // Current line was found : calculate the new position
+                    if ( line && (i - offset) >= 0) {
+                        CGFloat xOffsetToPosition = CTLineGetOffsetForStringIndex(line, newPos, NULL);
+                        newPos = CTLineGetStringIndexForPosition(CFArrayGetValueAtIndex(lines, i - offset),
+																 CGPointMake(xOffsetToPosition, 0.0f));
+                    } else {
+                        newPos = 0;
+                    }
+                    break;
+                }
+            }
+        } break;
+        case UITextLayoutDirectionDown: {
+            // Iterate through lines to find the one which contains the position given
+            CFArrayRef lines = CTFrameGetLines(_frame);
+            for (NSUInteger i = 0; i < CFArrayGetCount(lines); i++) {
+                CTLineRef line = CFArrayGetValueAtIndex(lines, i);
+                CFRange lineRange = CTLineGetStringRange(line);
+                if (lineRange.location <= newPos && newPos <= lineRange.location + lineRange.length) {
+                    // Current line was found : calculate the new position
+                    if (line && (i + offset) < CFArrayGetCount(lines)) {
+                        CGFloat xOffsetToPosition = CTLineGetOffsetForStringIndex(line, newPos, NULL);
+                        newPos = CTLineGetStringIndexForPosition(CFArrayGetValueAtIndex(lines, i + offset),
+																 CGPointMake(xOffsetToPosition, 0.0f));
+                    } else {
+                        newPos = _attributedString.length;
+                    }
+                    break;
+                }
+            }
+        } break;
+        default: break;
     }
     	
     if (newPos < 0)
